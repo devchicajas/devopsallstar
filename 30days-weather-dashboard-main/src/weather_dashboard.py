@@ -2,8 +2,10 @@ import os
 import json
 import boto3
 import requests
+import pandas as pd
 from datetime import datetime
 from dotenv import load_dotenv
+import streamlit as st
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +24,6 @@ class WeatherDashboard:
         except:
             print(f"Creating bucket {self.bucket_name}")
         try:
-            # Simpler creation for us-east-1
             self.s3_client.create_bucket(Bucket=self.bucket_name)
             print(f"Successfully created bucket {self.bucket_name}")
         except Exception as e:
@@ -67,34 +68,54 @@ class WeatherDashboard:
             print(f"Error saving to S3: {e}")
             return False
 
-def main():
+def fetch_weather_for_dashboard(cities):
+    """Fetch weather data for multiple cities and return as a DataFrame"""
     dashboard = WeatherDashboard()
-    
-    # Create bucket if needed
-    dashboard.create_bucket_if_not_exists()
-    
-    cities = ["Philadelphia", "Seattle", "New York"]
-    
-    for city in cities:
-        print(f"\nFetching weather for {city}...")
-        weather_data = dashboard.fetch_weather(city)
-        if weather_data:
-            temp = weather_data['main']['temp']
-            feels_like = weather_data['main']['feels_like']
-            humidity = weather_data['main']['humidity']
-            description = weather_data['weather'][0]['description']
-            
-            print(f"Temperature: {temp}°F")
-            print(f"Feels like: {feels_like}°F")
-            print(f"Humidity: {humidity}%")
-            print(f"Conditions: {description}")
-            
-            # Save to S3
-            success = dashboard.save_to_s3(weather_data, city)
-            if success:
-                print(f"Weather data for {city} saved to S3!")
-        else:
-            print(f"Failed to fetch weather data for {city}")
+    weather_data = []
 
+    for city in cities:
+        city = city.strip()
+        data = dashboard.fetch_weather(city)
+        if data:
+            weather_data.append({
+                "City": city,
+                "Temperature (°F)": data['main']['temp'],
+                "Feels Like (°F)": data['main']['feels_like'],
+                "Humidity (%)": data['main']['humidity'],
+                "Conditions": data['weather'][0]['description'],
+                "Timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            })
+
+    return pd.DataFrame(weather_data)
+
+# Streamlit Dashboard
+def streamlit_dashboard():
+    st.title("Weather Dashboard 🌦️")
+    st.sidebar.header("Settings")
+
+    # Get user input
+    cities = st.sidebar.text_input("Enter cities (comma-separated)", "Philadelphia, Seattle, New York").split(",")
+
+    if st.sidebar.button("Fetch Weather"):
+        # Fetch weather data
+        df = fetch_weather_for_dashboard(cities)
+        if not df.empty:
+            st.header("Weather Data")
+            st.dataframe(df)
+
+            # Visualizations
+            st.subheader("Temperature Comparison")
+            st.bar_chart(df.set_index("City")[["Temperature (°F)", "Feels Like (°F)"]])
+
+            st.subheader("Humidity Comparison")
+            st.bar_chart(df.set_index("City")["Humidity (%)"])
+
+            st.subheader("Conditions Overview")
+            st.table(df[["City", "Conditions"]])
+
+        else:
+            st.error("Failed to fetch weather data for the cities provided.")
+
+# Run the Streamlit dashboard
 if __name__ == "__main__":
-    main()
+    streamlit_dashboard()

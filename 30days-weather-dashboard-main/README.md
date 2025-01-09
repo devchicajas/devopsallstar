@@ -76,3 +76,6 @@ Implement data visualization
 Add more cities
 Create automated testing
 Set up CI/CD pipeline
+
+
+To install requirements.txt it is : pip install -r requirements.txt
