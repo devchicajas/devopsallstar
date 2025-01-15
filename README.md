@@ -1,3 +1,4 @@
-# devopsallstar
+# DevOps 30 day Challenge 
 
-day 1 - weather dashboard
+Day 1 - Weather dashboard
+Day 2 - Game  Day Notification 
